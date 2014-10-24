@@ -4,6 +4,7 @@ import os, sys, string, math
 from operator import itemgetter
 from optparse import OptionParser
 from csv import reader as csvReader
+from csv import writer as csvWriter
 
 def main():
 	usage = "usage: %prog -f file"
@@ -41,10 +42,13 @@ def csvToList(csvFile):
 			integerList.append([int (i) for i in line])
 	return integerList
 
-def listToCsv(integerList,filename):
+def listToCSV(integerList,filename):
 	# Converts nested list of integers to csv file of integers
-	
-	return 
+	with open(filename,'wb') as csvfile:
+		writer = csvWriter(csvfile,delimiter=',')
+		for row in integerList:
+			writer.writerow(row)
+	return filename
 
 def printPuzzle(puzzle):
 	# Prints puzzle in readable format
@@ -74,8 +78,11 @@ def printPuzzle(puzzle):
 	return
 
 def printCellOptions(unknowns,options):
+	previous = 0
 	for index,unknown in enumerate(unknowns):
+		if unknown[0] != previous: print '\n'
 		print unknown[0],unknown[1],whatBox(unknown[0],unknown[1]),options[index]
+		previous = unknown[0]
 	return
 
 def whatBox(rowNum, colNum):
@@ -95,6 +102,7 @@ def findZeros(inputList):
 
 def getSets(inputList):
 	# Form sets of rows, colums, and boxes:
+	# (possible expand to be able to adjust dimensions?)
 	rowSets = [] 
 	colSets = [set()]*9
 	boxSets = [set()]*9
@@ -223,14 +231,11 @@ if __name__ == "__main__":
 	if solved:	
 		printPuzzle(unSolved)
 		print 'The puzzle is solved!\n'
+		print listToCSV(unSolved,os.path.splitext(filename)[0]+'_solved.csv')
 	else:
-		if solved:
-			printPuzzle(unSolved)
-			print 'The puzzle is solved!\n'
-		else:
-			print 'I have failed you.\n'
-			printPuzzle(unSolved)
-			printCellOptions(unKnowns, cellOptions)
+		print 'I have failed you.\n'
+		printPuzzle(unSolved)
+		printCellOptions(unKnowns, cellOptions)
 			
 		
 	
