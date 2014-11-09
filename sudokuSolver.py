@@ -236,6 +236,8 @@ def checkOnlyOptions(unknowns,options):
 		unknownIndex += 1
 	
 	# Repeat algorithm for columns
+	while unknownIndex < (len(unknowns)-1):
+		otherUnknownIndex = 0
 		while otherUnknownIndex < (len(unknowns)-1):
 			colNumber = unknowns[unknownIndex][1]
 			# Compare with the sets in the same col but not itself
@@ -270,43 +272,58 @@ def checkOnlyOptions(unknowns,options):
 						# Next col (as long as we're not at the end) !
 						if unknownIndex<(len(unknowns)-1):unknownIndex += 1
 			otherUnknownIndex += 1
+		# Did the algorithm find a unique number?
+		if not possibleUnique == 0:
+			# It did!
+			options[unknownIndex] = set([possibleUnique])
+			
+		unknownIndex += 1
 
-	# Repeat algorithm for boxes:
-#	#unknownIndex = 0
-#	possibleUnique = 0
-#	while unknownIndex < (len(unknowns)-1):
-#		otherUnknownIndex = 0
-#		while otherUnknownIndex < (len(unknowns)-1):
-#			boxNumber = whatBox(unknowns[unknownIndex][0],unknowns[unknownIndex][1])
-#			# Compare with the sets in the same col but not itself
-#			otherBoxNumber = whatBox(unknowns[otherUnknownIndex][0],unknowns[otherUnknownIndex][1])
-#			if boxNumber == otherBoxNumber and unknownIndex != otherUnknownIndex:
-#				# Find difference:
-#				diff = options[unknownIndex] - options[otherUnknownIndex]
-#				if len(diff) == 1:
-#					if possibleUnique == 0:
-#						prospective = diff.pop()
-#						if prospective not in boxTests[unknowns[unknownIndex][1]]:
-#							possibleUnique = prospective
-#							otherUnknownIndex = 0
-#						else:
-#							possibleUnique = 0
-#					else:	
-#						# Might not be a unique value:
-#						if diff.pop() != possibleUnique:
-#							boxTests[boxNumber] = boxTests[boxNumber] | set([possibleUnique])
-#							possibleUnique = 0
-#						
-#				else:
-#					I hope you like it.  if possibleUnique != 0 and possibleUnique in options[otherUnknownIndex]:
-#						boxTests[boxNumber] = boxTests[boxNumber] | set([possibleUnique])
-#						possibleUnique = 0
-#						if unknownIndex<(len(unknowns)-1):unknownIndex += 1
-#			otherUnknownIndex += 1
-#		if not possibleUnique == 0:
-#			options[unknownIndex] = set([possibleUnique])
-#		unknownIndex += 1
-#
+	
+	# Repeat algorithm for boxes
+	while unknownIndex < (len(unknowns)-1):
+		boxNumber = whatBox(unknowns[unknownIndex][0],unknowns[unknownIndex][1])
+		while otherUnknownIndex < (len(unknowns)-1):
+			otherBoxNumber = whatBox(unknowns[otherUnknownIndex][0],unknowns[otherUnknownIndex][1])
+			# Compare with the sets in the same box but not itself
+			if boxNumber == unknowns[otherUnknownIndex][1] and unknownIndex != otherUnknownIndex:
+				# Find difference:
+				diff = options[unknownIndex] - options[otherUnknownIndex]
+				# Is there only one option?
+				if len(diff) == 1:
+					if possibleUnique == 0:
+						prospective = diff.pop()
+						# Has this number been tested before?
+						if prospective not in boxTests[unknowns[unknownIndex][1]]:
+							# No! Let's try it.
+							possibleUnique = prospective
+							# Start from the beginning of the box
+							otherUnknownIndex = 0
+						else:
+							# Not unique - we tested it before.
+							possibleUnique = 0
+					else:	
+						# Might not be a unique value:
+						if diff.pop() != possibleUnique:
+							# Not unique, remember that this number is not unique:
+							boxTests[boxNumber] = boxTests[boxNumber] | set([possibleUnique])
+							possibleUnique = 0
+						
+				else:
+					if possibleUnique != 0 and possibleUnique in options[otherUnknownIndex]:
+						# Not unique, remember that this number is not unique:
+						boxTests[boxNumber] = boxTests[boxNumber] | set([possibleUnique])
+						possibleUnique = 0
+						# Next box (as long as we're not at the end) !
+						if unknownIndex<(len(unknowns)-1):unknownIndex += 1
+			otherUnknownIndex += 1
+		# Did the algorithm find a unique number?
+		if not possibleUnique == 0:
+			# It did!
+			options[unknownIndex] = set([possibleUnique])
+			
+		unknownIndex += 1
+
 	return unknowns,options
 
 def inputOptions(unknowns,options,unsolved):
