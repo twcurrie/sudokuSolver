@@ -4,6 +4,7 @@ import os, sys, string, math
 from operator import itemgetter
 from optparse import OptionParser
 from csv import reader as csvReader
+from csv import writer as csvWriter
 
 def main():
 	usage = "usage: %prog -f file"
@@ -32,6 +33,8 @@ def main():
 	
 	return options.file, sudokuPuzzle
 
+# ----------------- Input/output functions ----------------
+
 def csvToList(csvFile):
 	# Converts csv file of integers to nested list of integers
 	integerList = []
@@ -41,25 +44,26 @@ def csvToList(csvFile):
 			integerList.append([int (i) for i in line])
 	return integerList
 
-def listToCsv(integerList,filename):
+def listToCSV(integerList,filename):
 	# Converts nested list of integers to csv file of integers
-	
-	return 
-	
-	
+	with open(filename,'wb') as csvfile:
+		writer = csvWriter(csvfile,delimiter=',')
+		for row in integerList:
+			writer.writerow(row)
+	return filename
 
 def printPuzzle(puzzle):
 	# Prints puzzle in readable format
 	rowNumber = 0
 	for row in puzzle:
-		entryNumber = 0
+		cellNumber = 0
 		rowToPrint = '|'
-		for entry in row:
-			if entry == 0: 
+		for cell in row:
+			if cell == 0: 
 	       			rowToPrint += '  '
-			else: rowToPrint += str(entry) + ' '
-			entryNumber += 1
-		       	if entryNumber%3 == 0: rowToPrint += '|'
+			else: rowToPrint += str(cell) + ' '
+			cellNumber += 1
+		       	if cellNumber%3 == 0: rowToPrint += '|'
 		if rowNumber%3 == 0:
        			print '-'*21
 		rowNumber += 1
@@ -76,9 +80,36 @@ def printPuzzle(puzzle):
 	return
 
 def printCellOptions(unknowns,options):
+	unknowns.sort(key=lambda x: x[0])
+
+	previous = 0
+	print 'R C B Options\n-------------'
 	for index,unknown in enumerate(unknowns):
-		print unknown[0],unknown[1],whatBox(unknown[0],unknown[1]),options[index]
-	return
+		unknowns[index].append(options[index])
+		if unknown[0] != previous: print ''
+		print unknown[0],unknown[1],whatBox(unknown[0],unknown[1]),unknown[2]
+		previous = unknown[0]
+	
+	previous = 0
+	print '\nR C B Options\n-------------'
+	unknowns.sort(key=lambda x: x[1])	
+	for unknown in unknowns:
+		if unknown[1] != previous: print ''
+		print unknown[0],unknown[1],whatBox(unknown[0],unknown[1]),unknown[2]
+		previous = unknown[1]
+
+	previous = 0
+	print '\nR C B Options\n-------------'
+	unknowns.sort(key=lambda x: whatBox(x[0],x[1]))
+	for unknown in unknowns:
+		if whatBox(unknown[0],unknown[1]) != previous: print ''
+		print unknown[0],unknown[1],whatBox(unknown[0],unknown[1]),unknown[2]
+		previous = whatBox(unknown[0],unknown[1])
+		
+	unknowns.sort(key=lambda x: x[0])
+	return True
+
+# ----------------- Data functions -------------------
 
 def whatBox(rowNum, colNum):
 	# Returns box number based on index of row and column
@@ -96,7 +127,8 @@ def findZeros(inputList):
 	return zeros
 
 def getSets(inputList):
-	# Form sets of rows, colums, and boxes:
+	# Form sets of numbers entered into the rows, colums, and boxes:
+	# (possible expand to be able to adjust dimensions?)
 	rowSets = [] 
 	colSets = [set()]*9
 	boxSets = [set()]*9
@@ -116,17 +148,30 @@ def getOptions(rowSets,colSets,boxSets,unknowns):
 	# Determines options for unknown cells by set differences
 
 	# Establish comparison set:
-	solvedRow = set([1,2,3,4,5,6,7,8,9])
+	solvedSet = set([1,2,3,4,5,6,7,8,9])
 
 	# Find out what can go in an unknown cell w/ set difference:
 	possibleOptions = []
-	for entry in unknowns:
-		row = entry[0]
-		col = entry[1]
-		eliminated = (rowSets[row].union(colSets[col])).union(boxSets[whatBox(row,col)])
-		possible = solvedRow.difference(eliminated)
+	for cell in unknowns:
+		row = cell[0]
+		col = cell[1]
+		solvedCells = (rowSets[row].union(colSets[col])).union(boxSets[whatBox(row,col)])
+		possible = solvedSet.difference(solvedCells)
 		possibleOptions.append(possible)
 	return possibleOptions
+
+def insertKnown(unsolved,index,known):
+	# Insert solved number into cell, does not enter if incorrect
+	rows, cols, boxs = getSets(unsolved)
+	if (known not in rows[index[0]]) and (known not in cols[index[1]]) and (known not in boxs[whatBox(index[0],index[1])]):
+		unsolved[index[0]][index[1]] = known
+		return unsolved		
+	else:
+		print str(known)+" cannot go in row "+str(index[0])+", column "+str(index[1])
+		return unsolved
+
+
+# ---------- Strategies used ------------------
 
 def eliminatePairs(unknowns,options,unsolved):
 	# Finds cells in same row, col, or box with matching option pairs and eliminates
@@ -138,69 +183,166 @@ def eliminatePairs(unknowns,options,unsolved):
 		if len(options[index]) == 2:
 			if options.count(options[index])>1:
 				pairs.append([unknown[0],unknown[1],options[index]])
+
+	# Need to find hidden pairs!!!! 
+	# Example:
+	# 	R C B Options
+	# 	-------------
+	# 	0 3 1 set([1, 4, 9])
+	# 	0 4 1 set([1, 4, 9])
+	# 	2 5 1 set([1, 9])
+	# Output: [0,3,set([1,4])], [0,3,set([1,4])]
 	
 	# Eliminate option pairs from other cells in row, col, box
 	for pairNumber, pair in enumerate(pairs):
-		for comPair in range(pairNumber+1, len(pairs)):
-			if pair[2] == pairs[comPair][2]:
+		for comPairIndex in range(pairNumber+1, len(pairs)):
+			if pair[2] == pairs[comPairIndex][2]:
 				# Check if same row:
-				if pair[0] == pairs[comPair][0]:
+				if pair[0] == pairs[comPairIndex][0]:
 				       # Eliminate numbers from other unknown cells in that row:
 					for index, unknown in enumerate(unknowns):
 						if (unknown[0] == pair[0]) and (pair[2] != options[index]):
 							options[index] = options[index] - pair[2]
 				# Check if same column:
-				if pair[1] == pairs[comPair][1]:
+				if pair[1] == pairs[comPairIndex][1]:
 				       # Eliminate numbers from other unknown cells in that column:
 					for index, unknown in enumerate(unknowns):
 						if (unknown[1] == pair[1]) and (pair[2] != options[index]):
 							options[index] = options[index] - pair[2]
 				# Check if same box:
 				pairBoxNumber = whatBox(pair[0],pair[1])
-				if whatBox(pair[0],pair[1]) == whatBox(pairs[comPair][0],pairs[comPair][1]):
+				if pairBoxNumber == whatBox(pairs[comPairIndex][0],pairs[comPairIndex][1]):
 					# Eliminate numbers from other unknown cells in that box:
 					for index, unknown in enumerate(unknowns):
 						boxNumber = whatBox(unknown[0],unknown[1])
 						if pairBoxNumber == boxNumber and (pair[2] != options[index]):
 							options[index] = options[index] - pair[2]
+	
 	return unknowns, options, unsolved
 
+def checkOnlyOptions(unknowns,options,rows,cols,boxs):
+	# Checks if there is a cell in a row, column or box that has an unique option 
+	# for that whole row, column, box
+	
+	# Establish comparison set:
+	solvedSet = set([1,2,3,4,5,6,7,8,9])
+	
+	# Algorithm for rows:
+	rowNumber = 0	
+	instance = [0,0]
+	while (rowNumber < len(rows)):
+		# Check options in the row
+		row = list(solvedSet - rows[rowNumber])
+		optionNumber = 0
+		while (optionNumber < len(row)):	
+			occurs = 0
+			cellNumber = 0
+			while ((cellNumber < len(unknowns)) and (occurs < 2)):
+				if unknowns[cellNumber][0] == rowNumber:
+					if row[optionNumber] in options[cellNumber]:		
+						instance = [cellNumber, row[optionNumber]]
+						occurs += 1
+				cellNumber += 1
+			if occurs == 1: # It's a unique option, store it in the option matrix
+				options[instance[0]] = set([instance[1]])
+			optionNumber += 1
+		rowNumber += 1	
+	
+	# Algorithm for cols:
+	colNumber = 0	
+	instance = [0,0]
+	while (colNumber < len(cols)):
+		# Check options in the col
+		col = list(solvedSet - cols[colNumber])
+		optionNumber = 0
+		while (optionNumber < len(col)):	
+			occurs = 0
+			cellNumber = 0
+			while ((cellNumber < len(unknowns)) and (occurs < 2)):
+				if unknowns[cellNumber][1] == colNumber:
+					if col[optionNumber] in options[cellNumber]:		
+						instance = [cellNumber, col[optionNumber]]
+						occurs += 1
+				cellNumber += 1
+			if occurs == 1: # It's a unique option, store it in the option matrix
+				options[instance[0]] = set([instance[1]])
+			optionNumber += 1
+		colNumber += 1	
+
+	# Algorithm for boxs:
+	boxNumber = 0	
+	instance = [0,0]
+	while (boxNumber < len(boxs)):
+		# Check options in the box
+		box = list(solvedSet - boxs[boxNumber])
+		optionNumber = 0
+		while (optionNumber < len(box)):	
+			occurs = 0
+			cellNumber = 0
+			while ((cellNumber < len(unknowns)) and (occurs < 2)):
+				if whatBox(unknowns[cellNumber][0],unknowns[cellNumber][1]) == boxNumber:
+					if box[optionNumber] in options[cellNumber]:		
+						instance = [cellNumber, box[optionNumber]]
+						occurs += 1
+				cellNumber += 1
+			if occurs == 1: # It's a unique option, store it in the option matrix
+				options[instance[0]] = set([instance[1]])
+			optionNumber += 1
+		boxNumber += 1
+		
+	return unknowns,options
+
+# ---------------- Main implementation of strategies -------------------
 def inputOptions(unknowns,options,unsolved):
-	# Determines cells with only one option for cell, escapes after not reducing unknown cells
-	# whether its solved or not
+	# Determines cells with only one option for cell by applying strategies and
+	# escapes after not reducing unknown cells whether its solved or not
+	unsuccessfulPasses = 0
 	trialNumber = 0
 	numUnknowns = len(unknowns)
 	solved = False
-	while len(unknowns) != 0:
-		# Replace eliminated numbers
-		for index, entry in enumerate(unknowns):
-			if len(options[index]) == 1:
-				unsolved[entry[0]][entry[1]] = options[index].pop()
+	while (numUnknowns != 0) and (unsuccessfulPasses < 4):
 		# Locate unknowns 
 		unknowns = findZeros(unsolved)
 
-		# Break routine after non-reduction of cell options - Change strategy!	
-		if numUnknowns == len(unknowns):
-			return unsolved, unknowns, options, solved
-		else:
-			if len(unknowns) != 0:
-				if trialNumber == 1:
-					print 'After '+str(trialNumber)+' pass, the puzzle is:'
-				else:
-					print 'After '+str(trialNumber)+' passes, the puzzle is:'
-				printPuzzle(unsolved)
-		numUnknowns = len(unknowns)
-		trialNumber += 1
 		# Get sets of options for each row, col, box
-		optionRows, optionCols, optionBoxs = getSets(unsolved)
+		rows, cols, boxs = getSets(unsolved)
 	
 		# Get cell options
-		options = getOptions(optionRows, optionCols, optionBoxs, unknowns)
+		options = getOptions(rows, cols, boxs, unknowns)
 		
 		# Eliminate pairs
 		unknowns, options, unsolved = eliminatePairs(unknowns,options,unsolved)
-
-	if numUnknowns == 0:
+		
+		# Check for only options
+		unknowns, options = checkOnlyOptions(unknowns,options,rows,cols,boxs)
+		
+		# Insert the option if there's only one!
+		squaresFilled = 0
+		for cellNumber, cell in enumerate(unknowns):
+			if len(options[cellNumber]) == 1:
+				squaresFilled += 1
+				unsolved = insertKnown(unsolved,[cell[0],cell[1]],options[cellNumber].pop())
+		
+		# Break routine after two non-reductions of cell options
+		if numUnknowns == len(unknowns):
+			unsuccessfulPasses +=1 
+			print 'Unsuccessful Pass! (Number '+str(unsuccessfulPasses)+')\n'
+		else:
+			unsuccessfulPasses = 0
+	
+		if len(options) != squaresFilled and len(unknowns) != 0:
+			if trialNumber == 1:
+				print 'After '+str(trialNumber)+' pass, the puzzle is:'
+			else:
+				print 'After '+str(trialNumber)+' passes, the puzzle is:'
+			printPuzzle(unsolved)
+	
+		numUnknowns = len(unknowns)
+		trialNumber += 1
+		
+	if numUnknowns != 0:
+		printCellOptions(unknowns,options)
+	else:
 		solved = True
 
 	return unsolved, unknowns, options, solved
@@ -221,18 +363,15 @@ if __name__ == "__main__":
 	
 	# Check for unknown cells
 	unSolved, unKnowns, cellOptions, solved  = inputOptions(unKnowns,cellOptions,unSolved)
-	
+
 	if solved:	
 		printPuzzle(unSolved)
 		print 'The puzzle is solved!\n'
+		print listToCSV(unSolved,os.path.splitext(filename)[0]+'_solved.csv\n')
 	else:
-		if solved:
-			printPuzzle(unSolved)
-			print 'The puzzle is solved!\n'
-		else:
-			print 'I have failed you.\n'
-			printPuzzle(unSolved)
-			printCellOptions(unKnowns, cellOptions)
+		print '\nI have failed you.\n'
+		printPuzzle(unSolved)
+	
 			
 		
 	
