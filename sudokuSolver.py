@@ -221,24 +221,28 @@ def eliminatePairs(unknowns,options,unsolved):
 	return unknowns, options, unsolved
 
 def checkOnlyOptions(unknowns,options,rows,cols,boxs):
-	# Checks if there is a cell in a row, column or box that has an unique option 
-	# for that whole row, column, box
-	
-	groups = [rows,cols,boxs]	
-	# Algorithm for rows:
-	groupNumber = 0	
-	instance = [0,0]
-	for group, groupTest in groups:
-		while (groupNumber < len(group)):
-			# Check options in the row
-			row = list(solvedSet - groups[groupNumber])
+	# Checks if there is a cell in a row, col or box that has an unique option 
+	# for that whole row, col, box
+	allGroups = [rows,cols,boxs]
+	for groupTest, groups in enumerate(allGroups):
+		groupNumber = 0	
+		instance = [0,0]
+		while (groupNumber < len(groups)):
+			# Find the possible options for each group:
+			group = list(solvedSet - groups[groupNumber])
 			optionNumber = 0
+			# Go through each option to see if its found in only one cell
 			while (optionNumber < len(group)):	
 				occurs = 0
 				cellNumber = 0
+				# Check how many times it occurs in each cell of the group, 
+				# but stop checking if it happens more than once
 				while ((cellNumber < len(unknowns)) and (occurs < 2)):
+					# If the cell is in the group:
 					if whatRowColOrBox[groupTest](unknowns[cellNumber]) == groupNumber:
+						# If the option is in the cell:
 						if group[optionNumber] in options[cellNumber]:		
+							# Then it occurred and remember it!
 							instance = [cellNumber, group[optionNumber]]
 							occurs += 1
 					cellNumber += 1
@@ -246,68 +250,6 @@ def checkOnlyOptions(unknowns,options,rows,cols,boxs):
 					options[instance[0]] = set([instance[1]])
 				optionNumber += 1
 			groupNumber += 1	
-#
-#
-#	while (rowNumber < len(rows)):
-#		# Check options in the row
-#		row = list(solvedSet - rows[rowNumber])
-#		optionNumber = 0
-#		while (optionNumber < len(row)):	
-#			occurs = 0
-#			cellNumber = 0
-#			while ((cellNumber < len(unknowns)) and (occurs < 2)):
-#				if whatRow(unknowns[cellNumber]) == rowNumber:
-#					if row[optionNumber] in options[cellNumber]:		
-#						instance = [cellNumber, row[optionNumber]]
-#						occurs += 1
-#				cellNumber += 1
-#			if occurs == 1: # It's a unique option, store it in the option matrix
-#				options[instance[0]] = set([instance[1]])
-#			optionNumber += 1
-#		rowNumber += 1	
-#	
-#	# Algorithm for cols:
-#	colNumber = 0	
-#	instance = [0,0]
-#	while (colNumber < len(cols)):
-#		# Check options in the col
-#		col = list(solvedSet - cols[colNumber])
-#		optionNumber = 0
-#		while (optionNumber < len(col)):	
-#			occurs = 0
-#			cellNumber = 0
-#			while ((cellNumber < len(unknowns)) and (occurs < 2)):
-#				if whatCol(unknowns[cellNumber]) == colNumber:
-#					if col[optionNumber] in options[cellNumber]:		
-#						instance = [cellNumber, col[optionNumber]]
-#						occurs += 1
-#				cellNumber += 1
-#			if occurs == 1: # It's a unique option, store it in the option matrix
-#				options[instance[0]] = set([instance[1]])
-#			optionNumber += 1
-#		colNumber += 1	
-#
-#	# Algorithm for boxs:
-#	boxNumber = 0	
-#	instance = [0,0]
-#	while (boxNumber < len(boxs)):
-#		# Check options in the box
-#		box = list(solvedSet - boxs[boxNumber])
-#		optionNumber = 0
-#		while (optionNumber < len(box)):	
-#			occurs = 0
-#			cellNumber = 0
-#			while ((cellNumber < len(unknowns)) and (occurs < 2)):
-#				if whatBox(unknowns[cellNumber]) == boxNumber:
-#					if box[optionNumber] in options[cellNumber]:		
-#						instance = [cellNumber, box[optionNumber]]
-#						occurs += 1
-#				cellNumber += 1
-#			if occurs == 1: # It's a unique option, store it in the option matrix
-#				options[instance[0]] = set([instance[1]])
-#			optionNumber += 1
-#		boxNumber += 1
-		
 	return unknowns,options
 
 # ---------------- Main implementation of strategies -------------------
