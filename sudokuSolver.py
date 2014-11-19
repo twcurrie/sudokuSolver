@@ -6,6 +6,9 @@ from optparse import OptionParser
 from csv import reader as csvReader
 from csv import writer as csvWriter
 
+# Establish comparison set:
+solvedSet = set(range(1,10))
+
 def main():
 	usage = "usage: %prog -f file"
 	parser = OptionParser(usage)
@@ -87,7 +90,7 @@ def printCellOptions(unknowns,options):
 	for index,unknown in enumerate(unknowns):
 		unknowns[index].append(options[index])
 		if unknown[0] != previous: print ''
-		print unknown[0],unknown[1],whatBox(unknown[0],unknown[1]),unknown[2]
+		print unknown[0],unknown[1],whatBox(unknown),unknown[2]
 		previous = unknown[0]
 	
 	previous = 0
@@ -95,25 +98,32 @@ def printCellOptions(unknowns,options):
 	unknowns.sort(key=lambda x: x[1])	
 	for unknown in unknowns:
 		if unknown[1] != previous: print ''
-		print unknown[0],unknown[1],whatBox(unknown[0],unknown[1]),unknown[2]
+		print unknown[0],unknown[1],whatBox(unknown),unknown[2]
 		previous = unknown[1]
 
 	previous = 0
 	print '\nR C B Options\n-------------'
-	unknowns.sort(key=lambda x: whatBox(x[0],x[1]))
+	unknowns.sort(key=lambda x: whatBox(x))
 	for unknown in unknowns:
-		if whatBox(unknown[0],unknown[1]) != previous: print ''
-		print unknown[0],unknown[1],whatBox(unknown[0],unknown[1]),unknown[2]
-		previous = whatBox(unknown[0],unknown[1])
+		if whatBox(unknown) != previous: print ''
+		print unknown[0],unknown[1],whatBox(unknown),unknown[2]
+		previous = whatBox(unknown)
 		
 	unknowns.sort(key=lambda x: x[0])
 	return True
 
 # ----------------- Data functions -------------------
+def whatRow(unknown):
+	# Returns row number
+	return unknown[0]
 
-def whatBox(rowNum, colNum):
+def whatCol(unknown):
+	# Returns col number
+	return unknown[1]
+
+def whatBox(unknown):
 	# Returns box number based on index of row and column
-	boxNumber = 3*math.floor(rowNum/3) + math.floor(colNum/3) 
+	boxNumber = 3*math.floor(whatRow(unknown)/3) + math.floor(whatCol(unknown)/3) 
 	return int(boxNumber)
 
 def findZeros(inputList):
@@ -139,7 +149,7 @@ def getSets(inputList):
 			# Enter column set next:	
 			colSets[colNumber] = colSets[colNumber] | {colEntry}
 			# Lastly determine box set:
-			boxNumber = whatBox(rowNumber, colNumber)
+			boxNumber = whatBox([rowNumber, colNumber])
 			boxSets[boxNumber] = boxSets[boxNumber] | {colEntry}
 
 	return rowSets,colSets,boxSets
@@ -147,15 +157,12 @@ def getSets(inputList):
 def getOptions(rowSets,colSets,boxSets,unknowns):
 	# Determines options for unknown cells by set differences
 
-	# Establish comparison set:
-	solvedSet = set([1,2,3,4,5,6,7,8,9])
-
 	# Find out what can go in an unknown cell w/ set difference:
 	possibleOptions = []
 	for cell in unknowns:
 		row = cell[0]
 		col = cell[1]
-		solvedCells = (rowSets[row].union(colSets[col])).union(boxSets[whatBox(row,col)])
+		solvedCells = (rowSets[row].union(colSets[col])).union(boxSets[whatBox(cell)])
 		possible = solvedSet.difference(solvedCells)
 		possibleOptions.append(possible)
 	return possibleOptions
@@ -163,7 +170,7 @@ def getOptions(rowSets,colSets,boxSets,unknowns):
 def insertKnown(unsolved,index,known):
 	# Insert solved number into cell, does not enter if incorrect
 	rows, cols, boxs = getSets(unsolved)
-	if (known not in rows[index[0]]) and (known not in cols[index[1]]) and (known not in boxs[whatBox(index[0],index[1])]):
+	if (known not in rows[index[0]]) and (known not in cols[index[1]]) and (known not in boxs[whatBox(index)]):
 		unsolved[index[0]][index[1]] = known
 		return unsolved		
 	else:
@@ -210,11 +217,11 @@ def eliminatePairs(unknowns,options,unsolved):
 						if (unknown[1] == pair[1]) and (pair[2] != options[index]):
 							options[index] = options[index] - pair[2]
 				# Check if same box:
-				pairBoxNumber = whatBox(pair[0],pair[1])
-				if pairBoxNumber == whatBox(pairs[comPairIndex][0],pairs[comPairIndex][1]):
+				pairBoxNumber = whatBox(pair)
+				if pairBoxNumber == whatBox(pairs[comPairIndex]):
 					# Eliminate numbers from other unknown cells in that box:
 					for index, unknown in enumerate(unknowns):
-						boxNumber = whatBox(unknown[0],unknown[1])
+						boxNumber = whatBox(unknown)
 						if pairBoxNumber == boxNumber and (pair[2] != options[index]):
 							options[index] = options[index] - pair[2]
 	
@@ -223,9 +230,6 @@ def eliminatePairs(unknowns,options,unsolved):
 def checkOnlyOptions(unknowns,options,rows,cols,boxs):
 	# Checks if there is a cell in a row, column or box that has an unique option 
 	# for that whole row, column, box
-	
-	# Establish comparison set:
-	solvedSet = set([1,2,3,4,5,6,7,8,9])
 	
 	# Algorithm for rows:
 	rowNumber = 0	
@@ -280,7 +284,7 @@ def checkOnlyOptions(unknowns,options,rows,cols,boxs):
 			occurs = 0
 			cellNumber = 0
 			while ((cellNumber < len(unknowns)) and (occurs < 2)):
-				if whatBox(unknowns[cellNumber][0],unknowns[cellNumber][1]) == boxNumber:
+				if whatBox(unknowns[cellNumber]) == boxNumber:
 					if box[optionNumber] in options[cellNumber]:		
 						instance = [cellNumber, box[optionNumber]]
 						occurs += 1
