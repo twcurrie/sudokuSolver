@@ -33,7 +33,9 @@ def main():
 	
 	return options.file, sudokuPuzzle
 
-# ----------------- Input/output functions ----------------
+# -------------------------------------------------------------
+# ------------------- INPUT/OUTPUT FUNCTIONS ------------------
+# -------------------------------------------------------------
 
 def csvToList(csvFile):
 	# Converts csv file of integers to nested list of integers
@@ -80,6 +82,7 @@ def printPuzzle(puzzle):
 	return
 
 def printCellOptions(unknowns,options):
+	# Prints unknown cell options
 	unknowns.sort(key=lambda x: x[0])
 
 	previous = 0
@@ -109,7 +112,37 @@ def printCellOptions(unknowns,options):
 	unknowns.sort(key=lambda x: x[0])
 	return True
 
-# ----------------- Data functions -------------------
+def printPuzzleAndOptions(puzzle,unknowns,options):
+	columns = [0]*9
+	for index,option in enumerate(options):
+		if len(option) > columns[unknowns[index][1]]:
+			columns[unknowns[index][1]] = len(option)
+	rowNumber = 0
+	unknown = 0
+	for row in puzzle:
+		colNumber = 0
+		rowToPrint = '|'
+		for cell in row:
+			if cell == 0: 
+				spacing = ' '*((3*(columns[colNumber]))-(3*len(options[unknown]))+1)
+	       			rowToPrint += str(list(options[unknown]))+spacing
+				unknown += 1
+			else: 
+				spacing = ' '*(3*columns[colNumber])
+				rowToPrint += str(cell)+spacing
+			colNumber += 1
+		       	if colNumber%3 == 0: 
+				rowToPrint += '|'
+		if rowNumber%3 == 0:
+       			print '-'*(17+sum(columns)*3)
+		rowNumber += 1
+		print rowToPrint
+       	print '-'*(17+sum(columns)*3)+'\n'
+
+# -------------------------------------------------------------
+# --------------------- DATA FUNCTIONS ------------------------
+# -------------------------------------------------------------
+
 # Establish comparison set:
 solvedSet = set(range(1,10))
 
@@ -180,7 +213,9 @@ def insertKnown(unsolved,index,known):
 		return unsolved
 
 
-# ---------- Strategies used ------------------
+# -------------------------------------------------------------
+# -------------------- STRATEGY FUNCTIONS ---------------------
+# -------------------------------------------------------------
 
 def eliminatePairs(unknowns,options,unsolved):
 	# Finds cells in same row, col, or box with matching option pairs and eliminates
@@ -199,7 +234,8 @@ def eliminatePairs(unknowns,options,unsolved):
 	# 	-------------
 	# 	0 3 1 set([1, 4, 9])
 	# 	0 4 1 set([1, 4, 9])
-	# 	2 5 1 set([1, 9])
+	# 	2 5 1 set([1, 8])
+	# 	1 4 1 set([1, 8, 9])
 	# Output: [0,3,set([1,4])], [0,3,set([1,4])]
 	
 	# Eliminate the options found in pairs from other cells in row, col, box
@@ -300,9 +336,7 @@ def inputOptions(unknowns,options,unsolved):
 		numUnknowns = len(unknowns)
 		trialNumber += 1
 		
-	if numUnknowns != 0:
-		printCellOptions(unknowns,options)
-	else:
+	if numUnknowns == 0:
 		solved = True
 
 	return unsolved, unknowns, options, solved
@@ -331,9 +365,4 @@ if __name__ == "__main__":
 	else:
 		print '\nI have failed you.\n'
 		printPuzzle(unSolved)
-	
-			
-		
-	
-	
-
+		printPuzzleAndOptions(unSolved,unKnowns,cellOptions)
