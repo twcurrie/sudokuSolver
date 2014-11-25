@@ -113,6 +113,7 @@ def printCellOptions(unknowns,options):
 	return True
 
 def printPuzzleAndOptions(puzzle,unknowns,options):
+	unknowns.sort(key=lambda x: x[0])
 	columns = [0]*9
 	for index,option in enumerate(options):
 		if len(option) > columns[unknowns[index][1]]:
@@ -128,23 +129,23 @@ def printPuzzleAndOptions(puzzle,unknowns,options):
 	       			rowToPrint += str(list(options[unknown]))+spacing
 				unknown += 1
 			else: 
-				spacing = ' '*(3*columns[colNumber])
-				rowToPrint += str(cell)+spacing
+				spacing = (3*columns[colNumber])
+				rowToPrint += ' '*int((math.floor(spacing/2)))+str(cell)+' '*int(spacing-(math.floor(spacing/2)))
 			colNumber += 1
 		       	if colNumber%3 == 0: 
 				rowToPrint += '|'
 		if rowNumber%3 == 0:
-       			print '-'*(17+sum(columns)*3)
+       			print '-'*(13+sum(columns)*3)
 		rowNumber += 1
 		print rowToPrint
-       	print '-'*(17+sum(columns)*3)+'\n'
+       	print '-'*(13+sum(columns)*3)+'\n'
 
 # -------------------------------------------------------------
 # --------------------- DATA FUNCTIONS ------------------------
 # -------------------------------------------------------------
 
 # Establish comparison set:
-solvedSet = set(range(1,10))
+SOLVEDSET = set(range(1,10))
 
 def whatRow(unknown):
 	# Returns row number
@@ -161,6 +162,13 @@ def whatBox(unknown):
 
 # Function dictionary to simplify checking rows, cols, and boxs
 whatRowColOrBox = [lambda x: whatRow(x),lambda x: whatCol(x), lambda x: whatBox(x)]
+
+def sameGroup(unknown1,unknown2):
+	results = []
+	for test in whatRowColOrBox:
+		results.append(test(unknown1) == test(unknown2))
+	return results
+		
 
 def findZeros(inputList):
 	# Returns list of (row index, col index) of 0's in a nested list
@@ -198,62 +206,81 @@ def getOptions(rowSets,colSets,boxSets,unknowns):
 	for cell in unknowns:
 		solvedCells = (rowSets[whatRow(cell)].union(colSets[whatCol(cell)])).union(boxSets[whatBox(cell)])
 				# Check if same row:
-		possible = solvedSet.difference(solvedCells)
+		possible = SOLVEDSET.difference(solvedCells)
 		possibleOptions.append(possible)
 	return possibleOptions
 
 def insertKnown(unsolved,index,known):
 	# Insert solved number into cell, does not enter if incorrect
 	rows, cols, boxs = getSets(unsolved)
-	if (known not in rows[whatRow(index)]) and (known not in cols[whatCol(index)]) and (known not in boxs[whatBox(index)]):
+	if (	known not in rows[whatRow(index)] and 
+		known not in cols[whatCol(index)] and 
+		known not in boxs[whatBox(index)]):
+		# Insert the number!
 		unsolved[whatRow(index)][whatCol(index)] = known
-		return unsolved		
+		return False,unsolved		
 	else:
 		print str(known)+" cannot go in row "+str(whatRow(index))+", column "+str(whatCol(index))
-		return unsolved
-
+		print "\nI MADE A MISTAKE.\n"
+		return True,unsolved
 
 # -------------------------------------------------------------
 # -------------------- STRATEGY FUNCTIONS ---------------------
 # -------------------------------------------------------------
-
-def eliminatePairs(unknowns,options,unsolved):
-	# Finds cells in same row, col, or box with matching option pairs and eliminates
-	# those entries from the other cells in that row, col, or box.
-
-	# Determine option pairs in puzzle
-	pairs = []
+def findSiblings(unknowns,options,number):
+	# Determine cells with identical options in same row/col/box in puzzle
+	# (Referred to as siblings)
+	siblings = []
 	for index, unknown in enumerate(unknowns):
-		if len(options[index]) == 2:
+		if len(options[index]) == number:
 			if options.count(options[index])>1:
-				pairs.append([whatRow(unknown),whatCol(unknown),options[index]])
+				siblings.append([whatRow(unknown),whatCol(unknown),options[index]])
+	return siblings
 
-	# Need to find hidden pairs!!!! 
-	# Example:
-	# 	R C B Options
-	# 	-------------
-	# 	0 3 1 set([1, 4, 9])
-	# 	0 4 1 set([1, 4, 9])
-	# 	2 5 1 set([1, 8])
-	# 	1 4 1 set([1, 8, 9])
-	# Output: [0,3,set([1,4])], [0,3,set([1,4])]
-	
-	# Eliminate the options found in pairs from other cells in row, col, box
-	for pairNumber, pair in enumerate(pairs):
-		for comPairIndex in range(pairNumber+1, len(pairs)):
-			# If the pairs match:
-			if pair[2] == pairs[comPairIndex][2]:
-				# Check if they are the same row/col/box:
+newArray = object()
+
+def checkSiblings(sibling,siblings,functionCall = 0,allSiblings = newArray,familyGroups = newArray):
+	# Recursive function to find siblings sharing groups
+	functionCall +=1
+	index = siblings.index(sibling)+1
+	while index < (len(siblings)):
+		if sibling[2] == siblings[index][2]:
+			sharedGroups = sameGroup(sibling,siblings[index])
+			if familyGroups is newArray:
+				familyGroups = sameGroup(sibling,siblings[index])
+			if any([familyGroups[i] and sharedGroups[i] for i in range(0,3)]):
+				familyGroups = [familyGroups[i] and sharedGroups[i] for i in range(0,3)]
+				if allSiblings is newArray:
+					allSiblings = [sibling,siblings[index]]
+				else:
+					if siblings[index] not in allSiblings:
+						allSiblings.append(siblings[index])
+				if functionCall < (len(sibling[2])-1):
+					allSiblings = checkSiblings(siblings[index],siblings,
+									functionCall,allSiblings,familyGroups)
+			else:
+				familyGroups = newArray
+		index += 1
+	if allSiblings is newArray: allSiblings = []
+	else: 
+		if len(allSiblings) != len(sibling[2]): allSiblings = []
+	return allSiblings
+
+def eliminateSiblings(unknowns,options,unsolved):
+	# Finds cells in same row, col, or box with matching option twins and eliminates
+	# those entries from the other cells in that row, col, or box.
+	families = []
+	for numOfSiblings in range(1,4):
+		siblingGroups = findSiblings(unknowns,options,numOfSiblings)
+		for siblings in siblingGroups:
+			family = checkSiblings(siblings,siblingGroups)
+			if type(family) == list and len(family)== numOfSiblings:
 				for test in whatRowColOrBox:
-					# If they are in the same row/col/box:
-					if test(pair) == test(pairs[comPairIndex]):
-						# Eliminate those options from the options 
-						# in the other cells in that row/col/box:
-						for index, unknown in enumerate(unknowns):
-							# If the pairs are in the same row/col/box 
-							# and its not the same cell
-							if (test(unknown) == test(pair)) and (pair[2] != options[index]):
-								options[index] = options[index] - pair[2]
+					allTested = [test(sibling) for sibling in family]
+					if allTested[1:] == allTested[:-1]:
+						for index,unknown in enumerate(unknowns):
+							if (test(unknown) == test(family[0]) and family[0][2] != options[index]):
+									options[index] = options[index] - family[0][2]
 	return unknowns, options, unsolved
 
 def checkOnlyOptions(unknowns,options,rows,cols,boxs):
@@ -265,7 +292,7 @@ def checkOnlyOptions(unknowns,options,rows,cols,boxs):
 		instance = [0,0]
 		while (groupNumber < len(groups)):
 			# Find the possible options for each group:
-			group = list(solvedSet - groups[groupNumber])
+			group = list(SOLVEDSET - groups[groupNumber])
 			optionNumber = 0
 			# Go through each option to see if its found in only one cell
 			while (optionNumber < len(group)):	
@@ -296,7 +323,7 @@ def inputOptions(unknowns,options,unsolved):
 	trialNumber = 0
 	numUnknowns = len(unknowns)
 	solved = False
-	while (numUnknowns != 0) and (unsuccessfulPasses < 4):
+	while (numUnknowns != 0) and (unsuccessfulPasses < 2):
 		# Locate unknowns 
 		unknowns = findZeros(unsolved)
 
@@ -307,7 +334,7 @@ def inputOptions(unknowns,options,unsolved):
 		options = getOptions(rows, cols, boxs, unknowns)
 		
 		# Eliminate pairs
-		unknowns, options, unsolved = eliminatePairs(unknowns,options,unsolved)
+		unknowns, options, unsolved = eliminateSiblings(unknowns,options,unsolved)
 		
 		# Check for only options
 		unknowns, options = checkOnlyOptions(unknowns,options,rows,cols,boxs)
@@ -317,7 +344,7 @@ def inputOptions(unknowns,options,unsolved):
 		for cellNumber, cell in enumerate(unknowns):
 			if len(options[cellNumber]) == 1:
 				squaresFilled += 1
-				unsolved = insertKnown(unsolved,[cell[0],cell[1]],options[cellNumber].pop())
+				mistake, unsolved = insertKnown(unsolved,[cell[0],cell[1]],options[cellNumber].pop())
 		
 		# Break routine after two non-reductions of cell options
 		if numUnknowns == len(unknowns):
