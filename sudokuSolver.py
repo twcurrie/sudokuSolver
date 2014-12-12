@@ -72,7 +72,6 @@ def printPuzzle(puzzle):
 		print rowToPrint
 	print '-'*21+'\n'
 
-	# Check number of zeros (unknowns)
 	emptySquares = sum(row.count(0) for row in puzzle)
 	if not emptySquares == 0:
 		if emptySquares == 1:
@@ -130,7 +129,8 @@ def printPuzzleAndOptions(puzzle,unknowns,options):
 				unknown += 1
 			else: 
 				spacing = (3*columns[colNumber])
-				rowToPrint += ' '*int((math.floor(spacing/2)))+str(cell)+' '*int(spacing-(math.floor(spacing/2)))
+				rowToPrint += ' '*int((math.floor(spacing/2)))+str(cell)+\
+						' '*int(spacing-(math.floor(spacing/2)))
 			colNumber += 1
 		       	if colNumber%3 == 0: 
 				rowToPrint += '|'
@@ -195,27 +195,26 @@ def getSets(inputList):
 			# Lastly determine box set:
 			boxNumber = whatBox([rowNumber, colNumber])
 			boxSets[boxNumber] = boxSets[boxNumber] | {colEntry}
+	sets = [rowSets,colSets,boxSets]
+	return sets
 
-	return rowSets,colSets,boxSets
-
-def getOptions(rowSets,colSets,boxSets,unknowns):
+def getOptions(sets,unknowns):
 	# Determines options for unknown cells by set differences
-
-	# Find out what can go in an unknown cell w/ set difference:
+	ROWS,COLS,BOXS = 0,1,2
 	possibleOptions = []
 	for cell in unknowns:
-		solvedCells = (rowSets[whatRow(cell)].union(colSets[whatCol(cell)])).union(boxSets[whatBox(cell)])
-				# Check if same row:
+		solvedCells = sets[ROWS][whatRow(cell)].union(sets[COLS][whatCol(cell)].union(sets[BOXS][whatBox(cell)]))
 		possible = SOLVEDSET.difference(solvedCells)
 		possibleOptions.append(possible)
 	return possibleOptions
 
 def insertKnown(unsolved,index,known):
 	# Insert solved number into cell, does not enter if incorrect
-	rows, cols, boxs = getSets(unsolved)
-	if (	known not in rows[whatRow(index)] and 
-		known not in cols[whatCol(index)] and 
-		known not in boxs[whatBox(index)]):
+	ROWS,COLS,BOXS = 0,1,2
+	sets = getSets(unsolved)
+	if (	known not in sets[ROWS][whatRow(index)] and 
+		known not in sets[COLS][whatCol(index)] and 
+		known not in sets[BOXS][whatBox(index)]):
 		# Insert the number!
 		unsolved[whatRow(index)][whatCol(index)] = known
 		return False,unsolved		
@@ -241,21 +240,24 @@ newArray = object()
 
 def checkSiblings(sibling,siblings,functionCall = 0,allSiblings = newArray,familyGroups = newArray):
 	# Recursive function to find siblings sharing groups
+	ROW,COL,OPTIONS = 0,1,2
+	TESTS = range(0,3)
+
 	functionCall +=1
 	index = siblings.index(sibling)+1
 	while index < (len(siblings)):
-		if sibling[2] == siblings[index][2]:
+		if sibling[OPTIONS] == siblings[index][OPTIONS]:
 			sharedGroups = sameGroup(sibling,siblings[index])
 			if familyGroups is newArray:
 				familyGroups = sameGroup(sibling,siblings[index])
-			if any([familyGroups[i] and sharedGroups[i] for i in range(0,3)]):
-				familyGroups = [familyGroups[i] and sharedGroups[i] for i in range(0,3)]
+			if any([familyGroups[testNumber] and sharedGroups[testNumber] for testNumber in TESTS]):
+				familyGroups = [familyGroups[testNumber] and sharedGroups[testNumber] for testNumber in TESTS]
 				if allSiblings is newArray:
 					allSiblings = [sibling,siblings[index]]
 				else:
 					if siblings[index] not in allSiblings:
 						allSiblings.append(siblings[index])
-				if functionCall < (len(sibling[2])-1):
+				if functionCall < (len(sibling[OPTIONS])-1):
 					allSiblings = checkSiblings(siblings[index],siblings,
 									functionCall,allSiblings,familyGroups)
 			else:
@@ -263,53 +265,47 @@ def checkSiblings(sibling,siblings,functionCall = 0,allSiblings = newArray,famil
 		index += 1
 	if allSiblings is newArray: allSiblings = []
 	else: 
-		if len(allSiblings) != len(sibling[2]): allSiblings = []
+		if len(allSiblings) != len(sibling[OPTIONS]): allSiblings = []
 	return allSiblings
 
 def eliminateSiblings(unknowns,options,unsolved):
-	# Finds cells in same row, col, or box with matching option twins and eliminates
-	# those entries from the other cells in that row, col, or box.
-	families = []
-	for numOfSiblings in range(1,4):
+	# Finds cells in same row, col, or box with matching option twins/triplets/'siblings'
+	# and eliminates those entries from the other cells in that row, col, or box.
+	MINNUMBEROFSIBLINGS,MAXNUMBEROFSIBLINGS = 2,3
+	MEMBER, OPTIONS = 0,2
+	
+	for numOfSiblings in range(MINNUMBEROFSIBLINGS-1,MAXNUMBEROFSIBLINGS+1):
 		siblingGroups = findSiblings(unknowns,options,numOfSiblings)
 		for siblings in siblingGroups:
 			family = checkSiblings(siblings,siblingGroups)
 			if type(family) == list and len(family)== numOfSiblings:
 				for test in whatRowColOrBox:
 					allTested = [test(sibling) for sibling in family]
-					if allTested[1:] == allTested[:-1]:
+					if len(set(allTested)) == 1:
 						for index,unknown in enumerate(unknowns):
-							if (test(unknown) == test(family[0]) and family[0][2] != options[index]):
-									options[index] = options[index] - family[0][2]
+							if (test(unknown) == test(family[MEMBER]) \
+							and family[MEMBER][OPTIONS] != options[index]):
+									options[index] = options[index] - family[MEMBER][OPTIONS]
 	return unknowns, options, unsolved
 
-def checkOnlyOptions(unknowns,options,rows,cols,boxs):
+def checkOnlyOptions(unknowns,options,rowsColsBoxs):
 	# Checks if there is a cell in a row, col or box that has an unique option 
 	# for that whole row, col, box
-	allGroups = [rows,cols,boxs]
-	for groupTest, groups in enumerate(allGroups):
+	for testNumber, groups in enumerate(rowsColsBoxs):
 		groupNumber = 0	
 		instance = [0,0]
 		while (groupNumber < len(groups)):
-			# Find the possible options for each group:
 			group = list(SOLVEDSET - groups[groupNumber])
 			optionNumber = 0
-			# Go through each option to see if its found in only one cell
 			while (optionNumber < len(group)):	
-				occurs = 0
-				cellNumber = 0
-				# Check how many times it occurs in each cell of the group, 
-				# but stop checking if it happens more than once
+				cellNumber, occurs = 0, 0
 				while ((cellNumber < len(unknowns)) and (occurs < 2)):
-					# If the cell is in the group:
-					if whatRowColOrBox[groupTest](unknowns[cellNumber]) == groupNumber:
-						# If the option is in the cell:
+					if whatRowColOrBox[testNumber](unknowns[cellNumber]) == groupNumber:
 						if group[optionNumber] in options[cellNumber]:		
-							# Then it occurred and remember it!
 							instance = [cellNumber, group[optionNumber]]
 							occurs += 1
 					cellNumber += 1
-				if occurs == 1: # It's a unique option, store it in the option matrix
+				if occurs == 1: 
 					options[instance[0]] = set([instance[1]])
 				optionNumber += 1
 			groupNumber += 1	
@@ -319,32 +315,34 @@ def checkOnlyOptions(unknowns,options,rows,cols,boxs):
 def inputOptions(unknowns,options,unsolved):
 	# Determines cells with only one option for cell by applying strategies and
 	# escapes after not reducing unknown cells whether its solved or not
-	unsuccessfulPasses = 0
-	trialNumber = 0
+	ROW,COL,BOX = 0,1,2
+	PASSLIMIT = 2
+	
+	unsuccessfulPasses, trialNumber = 0, 0
 	numUnknowns = len(unknowns)
 	solved = False
-	while (numUnknowns != 0) and (unsuccessfulPasses < 2):
+	while (numUnknowns != 0) and (unsuccessfulPasses < PASSLIMIT):
 		# Locate unknowns 
 		unknowns = findZeros(unsolved)
 
 		# Get sets of options for each row, col, box
-		rows, cols, boxs = getSets(unsolved)
+		sets = getSets(unsolved)
 	
 		# Get cell options
-		options = getOptions(rows, cols, boxs, unknowns)
+		options = getOptions(sets, unknowns)
 		
 		# Eliminate pairs
 		unknowns, options, unsolved = eliminateSiblings(unknowns,options,unsolved)
 		
 		# Check for only options
-		unknowns, options = checkOnlyOptions(unknowns,options,rows,cols,boxs)
+		unknowns, options = checkOnlyOptions(unknowns,options,sets)
 		
 		# Insert the option if there's only one!
 		squaresFilled = 0
 		for cellNumber, cell in enumerate(unknowns):
 			if len(options[cellNumber]) == 1:
 				squaresFilled += 1
-				mistake, unsolved = insertKnown(unsolved,[cell[0],cell[1]],options[cellNumber].pop())
+				mistake, unsolved = insertKnown(unsolved,[cell[ROW],cell[COL]],options[cellNumber].pop())
 		
 		# Break routine after two non-reductions of cell options
 		if numUnknowns == len(unknowns):
@@ -377,10 +375,10 @@ if __name__ == "__main__":
 	unKnowns = findZeros(unSolved)
 	
 	# Get sets of options for each row, col, box
-	optionRows, optionCols, optionBoxs = getSets(unSolved)
+	optionSets = getSets(unSolved)
 	
 	# Get cell options
-	cellOptions = getOptions(optionRows, optionCols, optionBoxs, unKnowns)
+	cellOptions = getOptions(optionSets, unKnowns)
 	
 	# Check for unknown cells
 	unSolved, unKnowns, cellOptions, solved  = inputOptions(unKnowns,cellOptions,unSolved)
